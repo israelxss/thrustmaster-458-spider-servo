@@ -110,6 +110,30 @@ python test_all_modes.py
 
 ---
 
+## הידור מקוד מקור (Compiling from Source - Optional)
+
+> [!NOTE]
+> **אין חובה לקמפל!** התיקייה [`published_service/`](published_service/) כבר מכילה את כל קבצי ההרצה הבינאריים המוכנים והמעודכנים (Self-contained Plug & Play).
+
+אם בכל זאת תרצה לקמפל בעצמך מקוד המקור (ללא שום צורך בהתקנת Visual Studio הכבדה, אלא רק ב-CLI בסיסי ומינימלי):
+
+1. **התקנת ה-CLI בלבד (אם טרם מותקן):**
+   ```powershell
+   winget install Microsoft.DotNet.SDK.8
+   ```
+2. **הידור בפקודה אחת בודדת:**
+   ```powershell
+   dotnet publish service_source/WheelCompatibilityService/WheelCompatibilityService.csproj -c Release -o published_service
+   ```
+3. **עדכון השירות המותקן (ללא צורך במנהל):**
+   ```powershell
+   Stop-Service WheelCompatibilityService
+   Copy-Item published_service\* 'C:\Program Files (x86)\XboxWheelCompatibility\Service\' -Force -Recurse
+   Start-Service WheelCompatibilityService
+   ```
+
+---
+
 ## מבנה הפרויקט (Project Structure)
 
 * [`servo_controller.py`](servo_controller.py) - בקר הסרבו הראשי והממשק למשתמש.
