@@ -1,0 +1,19 @@
+﻿<Project Sdk="WixToolset.Sdk/4.0.1">
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <DefineConstants>Debug</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <SuppressPdbOutput>True</SuppressPdbOutput>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Bal.wixext" />
+    <PackageReference Include="WixToolset.Netfx.wixext" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WheelCompatibilityConfigurator\WheelCompatibilityConfigurator.csproj" />
+    <ProjectReference Include="..\WheelCompatibilityService\WheelCompatibilityService.csproj" />
+  </ItemGroup>
+</Project>
