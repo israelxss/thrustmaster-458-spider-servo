@@ -142,6 +142,7 @@ python test_all_modes.py
 * [`setup_permanent_admin.ps1`](setup_permanent_admin.ps1) - סקריפט הגדרת הרשאות חד-פעמי.
 * [`published_service/`](published_service/) - קבצי ההפעלה המהודרים של השירות (Plug & Play ללא תלות ב-SDK).
 * [`service_source/`](service_source/) - קוד המקור ב-C# (.NET) של שירות המנוע ו-`WheelMotorController`.
+* [`drivers/`](drivers/) - דרייברי החומרה המקוריים של Windows (`.inf`, `.sys`) עבור ההגה.
 * [`WHEEL_MOTOR_PROTOCOL.md`](WHEEL_MOTOR_PROTOCOL.md) - תיעוד טכני מלא של הפרוטוקול ונקודות הקצה ב-HTTP.
 * [`tmp/`](tmp/) - ספריה המכילה סקריפטים וקבצי בדיקה זמניים שנשמרו בצד.
 
