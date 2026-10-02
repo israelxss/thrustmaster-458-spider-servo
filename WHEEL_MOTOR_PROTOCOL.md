@@ -1,153 +1,204 @@
-# מדריך טכני והנדוס לאחור: פרוטוקול ובקרת מנוע להגה Thrustmaster (Xbox/PC)
-## תיעוד הנדסי, פרוטוקול תקשורת ומימוש API מלא ב-Rust וב-Python
+# Technical Engineering Guide: Wheel Motor Control Protocol & Architecture
+## Thrustmaster Racing Wheel (Xbox/PC) Force Feedback Protocol & Closed-Loop Servo Control
 
 ---
 
-## תוכן עניינים
-1. [תקציר מנהלים וניתוח הבעיה ("למה ההגה תפוס?")](#1-תקציר-מנהלים-וניתוח-הבעיה)
-2. [זיהוי החומרה ברמת ה-USB והפרוטוקול](#2-זיהוי-החומרה-ברמת-ה-usb-והפרוטוקול)
-3. [הנדוס לאחור של מנהל ההתקן (XboxWheelCompatibility)](#3-הנדוס-לאחור-של-מנהל-ההתקן-xboxwheelcompatibility)
-4. [ארכיטקטורת בקרת המנוע (Force Feedback & Motor Architecture)](#4-ארכיטקטורת-בקרת-המנוע-force-feedback--motor-architecture)
-5. [פרוטוקול התקשורת ו-API (HTTP / RPC)](#5-פרוטוקול-התקשורת-ו-api-http--rpc)
-6. [מימוש מלא ב-Rust (קוד וספרייה)](#6-מימוש-מלא-ב-rust-קוד-וספרייה)
-7. [מימוש ב-Python ודוגמאות cURL](#7-מימוש-ב-python-ודוגמאות-curl)
-8. [הוראות התקנה והפעלה שלב-אחר-שלב](#8-הוראות-התקנה-והפעלה-שלב-אחר-שלב)
+## Table of Contents
+1. [Executive Summary & Problem Analysis ("Why was the wheel stiff/locked?")](#1-executive-summary--problem-analysis)
+2. [Hardware Identification & USB Protocol](#2-hardware-identification--usb-protocol)
+3. [Reverse Engineering the Driver Architecture](#3-reverse-engineering-the-driver-architecture)
+4. [Force Feedback & Motor Control Architecture](#4-force-feedback--motor-control-architecture)
+5. [Communication Protocol & HTTP REST API](#5-communication-protocol--http-rest-api)
+6. [Python Implementation & cURL Examples](#6-python-implementation--curl-examples)
+7. [Rust Implementation](#7-rust-implementation)
+8. [Closed-Loop Servo Controller & Settling Dynamics](#8-closed-loop-servo-controller--settling-dynamics)
+9. [Permanent Zero-UAC Authorization Setup](#9-permanent-zero-uac-authorization-setup)
 
 ---
 
-## 1. תקציר מנהלים וניתוח הבעיה
+## 1. Executive Summary & Problem Analysis
 
-### מה הסיבה שההגה "מחזיק את עצמו" (נעול/מתנגד)?
-בבסיס הגה מרוצים של Thrustmaster (סדרות TX / Ferrari 458 / T300) קיים מנוע Brushless (ללא פחמים) בעל גלגלות ורצועה כפולה (Dual-belt system). 
+### Why does the steering wheel resist or hold itself centered?
+Thrustmaster racing wheel bases (TX, Ferrari 458 Spider, T300) utilize a brushless industrial motor connected through a dual-belt pulley system.
 
-ברגע שההגה מחובר לשקע USB במחשב:
-1. **מצב אתחול GIP / Xbox:** ההגה עולה בברירת מחדל במזהה חומרה `044F:B664` (מצב Game Input Protocol של Xbox).
-2. **קפיץ מרכוז קשיח בחומרה (Default Firmware Centering Spring):** הקושחה (Firmware) הפנימית של בסיס ההגה מתוכננת כך שאם המחשב לא שולח פקודות Force Feedback פעילות, המנוע מפעיל באופן אוטומטי התנגדות קפיצית קבועה (Centering Resistance) כדי לשמור את ההגה ישר ולמנוע סיבוב חופשי.
-3. **הבעיה בתוכנת התאימות שהותקנה (`XboxWheelCompatibility`):** התוכנה קוראת אך ורק את הזוויות, הדוושות והכפתורים, ומזריקה אותם כבקר Xbox וירטואלי (`InputInjector`). התוכנה **אינה שולחת שום פקודת בקרת מנוע (Force Feedback)** בחזרה להגה!
-4. **התוצאה:** ההגה נותר "תפוס" וקשיח, מכיוון שאף גורם תוכנתי לא פקד על המנוע להשתחרר או לשנות את רמת ההתנגדות.
+When the wheel is connected to a computer over USB:
+1. **Xbox / GIP Initialization Mode:** The wheel enumerates by default with hardware ID `044F:B664` using the Microsoft Xbox Game Input Protocol (GIP).
+2. **Firmware Default Centering Spring:** The internal wheel base firmware is programmed so that if no active software Force Feedback effect is commanded by the PC, the microcontroller automatically applies internal centering resistance to hold the wheel centered and prevent it from freely spinning or falling under rim weight.
+3. **The Limitation of Upstream Compatibility Bridges:** Traditional compatibility bridges only read steering angle, pedals, and button states, injecting them as virtual gamepad inputs (`InputInjector`). They send **zero motor commands** back to the wheel base.
+4. **The Result:** The wheel remains permanently stiff and locked against the user because no software has taken ownership of the force feedback motor to command it to release.
 
 ---
 
-## 2. זיהוי החומרה ברמת ה-USB והפרוטוקול
+## 2. Hardware Identification & USB Protocol
 
-ההתקן שחובר זוהה בסריקת המערכת בפרטים הבאים:
+Device inspection on Windows reveals the following device configuration:
 * **Vendor ID (VID):** `0x044F` (Thrustmaster / Guillemot Corporation)
-* **Product ID (PID):** `0xB664` (Thrustmaster TX / Ferrari 458 Wheel Base במצב Xbox/GIP)
+* **Product ID (PID):** `0xB664` (Thrustmaster Wheel Base in Xbox/GIP mode)
 * **PnP Device ID:** `USB\VID_044F&PID_B664\0000E3DE012DB8F0`
-* **Driver Stack:** `XboxComposite.sys` $\rightarrow$ `xinputhid.sys` $\rightarrow$ `Windows.Gaming.Input`
+* **Driver Stack:** `XboxComposite.sys` $\rightarrow$ `xboxgip.sys` $\rightarrow$ `Windows.Gaming.Input`
 
 ```mermaid
 flowchart TD
-    Hardware["בסיס הגה Thrustmaster (044F:B664)"] -->|USB GIP Packets| Driver["Microsoft XboxComposite Driver"]
+    Hardware["Thrustmaster Wheel Base (044F:B664)"] -->|USB GIP Packets| Driver["Microsoft XboxComposite / xboxgip Driver"]
     Driver -->|WinRT Kernel Interface| WGI["Windows.Gaming.Input (UWP/WinRT Subsystem)"]
-    WGI -->|WheelReading| Reader["קריאת זוויות ודוושות (wheel_reader.py)"]
-    WGI -->|ForceFeedbackMotor| MotorCtrl["מנוע בקרת היזון כוח (WheelMotorController)"]
-    MotorCtrl -->|ConstantForceEffect / Damper / Spring| Hardware
+    WGI -->|RacingWheelReading| Reader["Telemetry Reader (wheel_motor_api.py)"]
+    WGI -->|ForceFeedbackMotor| MotorCtrl["Thread-Safe Motor Engine (WheelMotorController)"]
+    MotorCtrl -->|ConstantForceEffect / Gain| Hardware
 ```
 
 ---
 
-## 3. הנדוס לאחור של מנהל ההתקן (XboxWheelCompatibility)
+## 3. Reverse Engineering the Driver Architecture
 
-הפרויקט [XboxWheelCompatibility](https://github.com/camren-m/XboxWheelCompatibility) מורכב משלושה חלקים עיקריים:
+The core Windows subsystem provides direct access to force feedback devices via `Windows.Gaming.Input.RacingWheel`:
 
-1. **`WheelTransformer`:** ספריית C# שמתחברת ל-`Windows.Gaming.Input.RacingWheel.RacingWheels`.
-2. **`InjectionManager`:** קורא את הנתונים בלולאת מילי-שנייה ומבצע:
-   ```csharp
-   Injector.InjectGamepadInput(new InjectedInputGamepadInfo(new GamepadReading(...)));
-   ```
-3. **`WheelCompatibilityService`:** שירות Windows Service שרץ ברקע תחת הרשאות `NT AUTHORITY\SYSTEM` ומאזין בפורט TCP `16581` באמצעות פרוטוקול RPC של ספריית `ServiceWire`.
-
-### החולשה המבנית במימוש המקורי:
-המחלקה `RacingWheel` במערכת ההפעלה כוללת מאפיין מובנה בשם `WheelMotor` מסוג `Windows.Gaming.Input.ForceFeedback.ForceFeedbackMotor`.
-במימוש המקורי של הפרויקט, ה-`WheelMotor` הושאר ריק לחלוטין ללא שימוש, וכתוצאה מכך המנוע לא קיבל פקודות ביטול התנגדות או בקרת מומנט.
+1. **`RacingWheel` Enumeration:** The operating system enumerates all active racing wheels via `RacingWheel.RacingWheels`.
+2. **`WheelMotor` Property:** Each wheel exposes a `WheelMotor` instance of type `Windows.Gaming.Input.ForceFeedback.ForceFeedbackMotor`.
+3. **Windows Service Isolation:** Because non-elevated userland processes are blocked by Windows Security from enabling force feedback actuators without an active focused game window, `WheelCompatibilityService` runs under `NT AUTHORITY\SYSTEM`.
+4. **High-Speed Embedded REST Server:** The service embeds `HttpMotorServer`, listening on `127.0.0.1:16582` to bridge non-admin client scripts directly to the privileged WinRT motor engine with sub-millisecond latency.
 
 ---
 
-## 4. ארכיטקטורת בקרת המנוע (Force Feedback & Motor Architecture)
+## 4. Force Feedback & Motor Control Architecture
 
-כדי לאפשר בקרת מנוע מאפס וללא תלות בתוכנות יצרן כבדות, פיתחנו שכבת שליטה ישירה (`WheelMotorController`) המשתמשת באפקטים הבאים של Windows ForceFeedback:
+To control the motor without proprietary vendor suites, `WheelMotorController` manages physical actuators using WinRT ForceFeedback effects:
 
-### 1. שחרור ההגה (Release / Free Wheel)
+### 1. Releasing the Wheel (Zero-Resistance Free Float)
 ```csharp
-motor.StopAllEffects();
-motor.MasterGain = 0.0;
-await motor.TryDisableAsync();
+await _motorLock.WaitAsync();
+try
+{
+    _mode = WheelOperationMode.Released;
+    _targetAngle = null;
+    _constantForceEffect.SetParameters(new Vector3(1.0f, 0, 0), TimeSpan.FromSeconds(300));
+    _constantForceEffect.Gain = 0.0;
+    if (_constantForceEffect.State != ForceFeedbackEffectState.Running)
+    {
+        _constantForceEffect.Start();
+    }
+}
+finally
+{
+    _motorLock.Release();
+}
 ```
-* **פעולה:** עוצר את כל האפקטים הקיימים, מוריד את ההגבר של המנוע לאפס ומנתק את זרם ההחזקה.
-* **תוצאה:** ההגה מסתובב בחופשיות מוחלטת ללא שום התנגדות מוטורית.
+* **Mechanism:** Keeps a continuous `ConstantForceEffect` alive with `Gain = 0.0`.
+* **Result:** The firmware acknowledges that an active software effect is controlling the motor, which overrides and disables the internal hardware centering spring. The wheel rotates with zero resistance.
 
-### 2. אחיזה / נעילת ההגה (Hold Wheel)
+### 2. Holding / Locking the Wheel (Active Robotic Hold)
 ```csharp
-await motor.TryEnableAsync();
-motor.MasterGain = strength; // 0.0 עד 1.0
-var damper = new ConditionForceEffect(ConditionForceEffectKind.Damper);
-damper.SetParameters(new Vector3(1.0f, 0, 0), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f);
-await motor.LoadEffectAsync(damper);
-damper.Start();
+await _motorLock.WaitAsync();
+try
+{
+    _mode = WheelOperationMode.Holding;
+    _targetAngle = targetDeg;
+    _holdStrength = Math.Clamp(strength, 0.1, 1.0);
+}
+finally
+{
+    _motorLock.Release();
+}
 ```
-* **פעולה:** טוען ומפעיל אפקט שיכוך צמיגי (`Damper`).
-* **תוצאה:** ככל שמנסים לסובב את ההגה מהר יותר או להזיז אותו, המנוע מייצר מומנט נגדי חזק ש"נועל" ומחזיק את ההגה במקומו.
+* **Mechanism:** A high-speed background loop monitors the difference between `_targetAngle` and the actual encoder position. If an external disturbance turns the wheel away from target, it applies opposing counter-torque proportional to the displacement.
+* **Result:** The wheel is firmly locked at the commanded angle.
 
-### 3. משיכה למרכז (Center Spring)
+### 3. Directional Pulse Rotation
 ```csharp
-var spring = new ConditionForceEffect(ConditionForceEffectKind.Spring);
-spring.SetParameters(new Vector3(1.0f, 0, 0), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f);
-await motor.LoadEffectAsync(spring);
-spring.Start();
+Vector3 direction = torque >= 0 ? new Vector3(1.0f, 0, 0) : new Vector3(-1.0f, 0, 0);
+_constantForceEffect.SetParameters(direction, TimeSpan.FromSeconds(300));
+_constantForceEffect.Gain = Math.Abs(torque);
+await Task.Delay(durationMs);
+_constantForceEffect.Gain = 0.0;
 ```
-* **פעולה:** אפקט קפיץ וירטואלי שמחזיר את גלגל ההגה לזווית 0 מעלות בעוצמה הניתנת לשליטה.
-
-### 4. סיבוב אקטיבי של ההגה (Rotate Wheel)
-```csharp
-var constant = new ConstantForceEffect();
-await motor.LoadEffectAsync(constant);
-constant.SetParameters(new Vector3(torque, 0, 0), TimeSpan.FromMilliseconds(durationMs));
-constant.Gain = Math.Abs(torque);
-constant.Start();
-```
-* **פעולה:** הפעלת וקטור מומנט קבוע (`ConstantForceEffect`).
-* **ערכים:** `torque` בין `-1.0` (סיבוב שמאלה) ל-`+1.0` (סיבוב ימינה).
-* **תוצאה:** המנוע מסובב פיזית את גלגל ההגה לכיוון ולזמן המוגדרים.
+* **Mechanism:** Sends a synchronized, calibrated torque pulse for the exact duration specified, then immediately returns gain to `0.0`.
 
 ---
 
-## 5. פרוטוקול התקשורת ו-API (HTTP / RPC)
+## 5. Communication Protocol & HTTP REST API
 
-השירות המשודרג חושף שרת HTTP REST מהיר בפורט **`16582`** עם תמיכה מלאה ב-CORS וב-JSON:
+The background service exposes an HTTP REST API on port `16582` with full CORS and JSON support:
 
-| שיטה | נתיב | פרמטרים | תיאור הפעולה |
+| Method | Endpoint | Query Parameters | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/status` | ללא | קבלת טלמטריה מלאה: זווית נוכחית, דוושות, מצב מנוע ואפקט פעיל |
-| `POST` / `GET` | `/api/motor/release` | ללא | שחרור מיידי של המנוע (הגה מסתובב חופשי) |
-| `POST` / `GET` | `/api/motor/hold` | `strength` (ברירת מחדל: 0.8) | הפעלת בלימת מנוע והחזקת ההגה במקום |
-| `POST` / `GET` | `/api/motor/center` | `strength` (ברירת מחדל: 0.8) | משיכת ההגה חזרה למרכז (זווית 0) |
-| `POST` / `GET` | `/api/motor/rotate` | `torque` (-1.0 עד 1.0), `duration` (מילי-שניות) | סיבוב פיזי ימינה או שמאלה במומנט מוגדר |
-| `POST` / `GET` | `/api/motor/gain` | `value` (0.0 עד 1.0) | קביעת הגבר ראשי של המנוע (Master Gain) |
+| `GET` | `/api/status` | None | Returns full telemetry: current angle, pedals, motor status, and active effect. |
+| `POST` | `/api/motor/release` | None | Immediately releases the motor into zero-resistance free float. |
+| `POST` | `/api/motor/hold` | `strength` (default: 0.8), `angle` | Actively locks and holds the wheel at current or specified angle. |
+| `POST` | `/api/motor/lock` | `strength` (default: 0.8), `angle` | Alias for hold. |
+| `POST` | `/api/motor/rotate` | `torque` (-1.0 to 1.0), `duration` (ms) | Rotates wheel clockwise (positive) or counter-clockwise (negative). |
+| `POST` | `/api/motor/reset` | None | Reinitializes the force feedback motor driver and clears any faulted state. |
+| `POST` | `/api/motor/gain` | `value` (0.0 to 1.0) | Sets the master motor gain. |
 
-### דוגמת תשובת JSON מ-`/api/status`:
+### Sample JSON Response (`/api/status`):
 ```json
 {
   "WheelConnected": true,
   "HasMotor": true,
   "MotorEnabled": true,
-  "MasterGain": 0.8,
+  "MasterGain": 1.0,
   "SupportedAxes": "X",
-  "CurrentAngle": 0.013,
+  "CurrentAngle": 0.0053,
   "Throttle": 0.0,
   "Brake": 0.0,
-  "ActiveEffect": "Holding (Strength: 0.80)"
+  "ActiveEffect": "Released (Zero Resistance)",
+  "Mode": "Released",
+  "ConstantEffectState": "Running",
+  "ConstantEffectGain": 0.0,
+  "TargetAngle": null,
+  "LastLoadResult": "Succeeded",
+  "LastError": ""
 }
 ```
 
 ---
 
-## 6. מימוש מלא ב-Rust (קוד וספרייה)
+## 6. Python Implementation & cURL Examples
 
-פרויקט ה-Rust המלא נבנה ונמצא בתיקייה:
-`C:\Users\ישראל\Desktop\weel_motor\wheel_motor_rs`
+The Python client library is implemented in [`wheel_motor_api.py`](wheel_motor_api.py).
 
-### קובץ הספרייה (`src/lib.rs`):
+### Python Usage Example:
+```python
+from wheel_motor_api import WheelMotorAPI
+import time
+
+api = WheelMotorAPI()
+
+# 1. Check wheel status
+status = api.get_status()
+print(f"Current Angle: {status.get('CurrentAngle', 0.0) * 450.0:.1f}°")
+
+# 2. Release motor to free wheel
+api.release()
+time.sleep(1)
+
+# 3. Apply a discrete rotation pulse (50% torque for 100ms)
+api.rotate(torque=0.5, duration_ms=100)
+time.sleep(0.5)
+
+# 4. Lock wheel firmly in place
+api.lock(strength=0.85)
+```
+
+### cURL CLI Commands:
+```bash
+# Release to free wheel
+curl -X POST http://127.0.0.1:16582/api/motor/release
+
+# Lock at current position
+curl -X POST "http://127.0.0.1:16582/api/motor/lock?strength=0.85"
+
+# Rotate left with 60% torque for 200ms
+curl -X POST "http://127.0.0.1:16582/api/motor/rotate?torque=-0.6&duration=200"
+
+# Query status and angle telemetry
+curl http://127.0.0.1:16582/api/status
+```
+
+---
+
+## 7. Rust Implementation
+
+A high-performance standalone Rust client is easily implemented using standard TCP sockets:
+
 ```rust
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -196,12 +247,8 @@ impl WheelClient {
         self.http_request("POST", "/api/motor/release")
     }
 
-    pub fn hold(&self, strength: f64) -> Result<String, String> {
-        self.http_request("POST", &format!("/api/motor/hold?strength={:.2}", strength.clamp(0.0, 1.0)))
-    }
-
-    pub fn center(&self, strength: f64) -> Result<String, String> {
-        self.http_request("POST", &format!("/api/motor/center?strength={:.2}", strength.clamp(0.0, 1.0)))
+    pub fn lock(&self, strength: f64) -> Result<String, String> {
+        self.http_request("POST", &format!("/api/motor/lock?strength={:.2}", strength.clamp(0.0, 1.0)))
     }
 
     pub fn rotate(&self, torque: f32, duration_ms: u32) -> Result<String, String> {
@@ -214,111 +261,35 @@ impl WheelClient {
 }
 ```
 
-### הרצת כלי ה-CLI מ-Rust בטרמינל:
-```powershell
-# שחרור המנוע לחופש מוחלט
-cargo run --release --manifest-path C:\Users\ישראל\Desktop\weel_motor\wheel_motor_rs\Cargo.toml -- release
+---
 
-# החזקה ונעילה בעוצמה 80%
-cargo run --release --manifest-path C:\Users\ישראל\Desktop\weel_motor\wheel_motor_rs\Cargo.toml -- hold 0.8
+## 8. Closed-Loop Servo Controller & Settling Dynamics
 
-# סיבוב ההגה ימינה ב-50% מומנט למשך 600 מילי-שניות
-cargo run --release --manifest-path C:\Users\ישראל\Desktop\weel_motor\wheel_motor_rs\Cargo.toml -- rotate 0.5 600
+The servo positioning system ([`servo_controller.py`](servo_controller.py)) turns the racing wheel into a precision rotary servo motor using four core mechanisms:
 
-# משיכת ההגה למרכז (קפיץ)
-cargo run --release --manifest-path C:\Users\ישראל\Desktop\weel_motor\wheel_motor_rs\Cargo.toml -- center 0.8
+### 1. Settle-and-Measure Feedback Loop
+Rather than streaming continuous high-frequency torque packets that saturate USB buffers, the servo uses calibrated discrete impulses followed by a settle window:
+* **Large Distance ($> 80^\circ$):** 45ms impulse at 0.48 torque (~40° to 60° displacement).
+* **Medium Distance ($30^\circ - 80^\circ$):** 28ms impulse at 0.46 torque (~20° to 30° displacement).
+* **Approach ($8^\circ - 30^\circ$):** 18ms impulse at 0.43 torque (~8° to 12° displacement).
+* **Fine Settle ($3^\circ - 8^\circ$):** 14ms impulse at 0.41 torque (~3° to 5° displacement).
+* **Target Arrival ($< 3.0^\circ$):** Arrived; engage post-arrival action (`release` or `lock`).
 
-# בדיקת מצב נוכחי
-cargo run --release --manifest-path C:\Users\ישראל\Desktop\weel_motor\wheel_motor_rs\Cargo.toml -- status
-```
+### 2. Adaptive Static Friction Breakaway
+Steering mechanisms with belts, bearings, and motor cogging require at least ~0.46 torque to break from rest:
+* If the measured displacement over two consecutive steps is under $0.8^\circ$, a stall condition is detected.
+* Torque is adaptively boosted ($+0.03 \times \text{stall count}$) and duration is extended until movement resumes.
+
+### 3. Speed Pacing
+Requested speed ($S$ in $^\circ$/s) controls the step period:
+$$\text{Step Period} = \max\left(0.18\text{s}, \frac{20^\circ}{S}\right)$$
+Slower requested speeds simply increase the pause between impulses, preserving breakaway torque while maintaining consistent rotational velocity.
 
 ---
 
-## 7. מימוש ב-Python ודוגמאות cURL
+## 9. Permanent Zero-UAC Authorization Setup
 
-קובץ ה-API בפייתון זמין בנתיב:
-`C:\Users\ישראל\Desktop\weel_motor\wheel_motor_api.py`
-
-### דוגמת שימוש בקוד פייתון:
-```python
-from wheel_motor_api import WheelMotorAPI
-import time
-
-api = WheelMotorAPI()
-
-# 1. שחרור ההגה (Free wheel)
-print("משחרר את ההגה...")
-api.release()
-time.sleep(2)
-
-# 2. סיבוב ההגה ימינה ב-50% כוח
-print("מסובב ימינה...")
-api.rotate(torque=0.5, duration_ms=600)
-time.sleep(1)
-
-# 3. החזקת ההגה במקום (Hold/Lock)
-print("נועל ומחזיק את ההגה...")
-api.hold(strength=0.9)
-```
-
-### דוגמאות cURL מכל שורת פקודה:
-```bash
-# שחרור
-curl -X POST http://127.0.0.1:16582/api/motor/release
-
-# החזקה
-curl -X POST "http://127.0.0.1:16582/api/motor/hold?strength=0.85"
-
-# סיבוב שמאלה
-curl -X POST "http://127.0.0.1:16582/api/motor/rotate?torque=-0.6&duration=500"
-
-# קבלת סטטוס
-curl http://127.0.0.1:16582/api/status
-```
-
----
-
-## 8. הוראות התקנה והפעלה שלב-אחר-שלב
-
-הקוד המשודרג והמהודר מוכן בקובץ:
-`C:\Users\ישראל\Desktop\weel_motor\published_service\WheelCompatibilityService.exe`
-
-כדי להחיל את השדרוג על שירות המערכת הפעיל:
-1. נוצר עבורך סקריפט אישור חד-פעמי בשולחן העבודה:
-   [`setup_admin_once.bat`](file:///C:/Users/ישראל/Desktop/setup_admin_once.bat)
-2. **לחץ לחיצה כפולה** על `setup_admin_once.bat` ואשר "כן" בחלון ה-UAC.
-3. הסקריפט מעניק הרשאות קבועות, מגדיר משימה מתוזמנת ברישיון מנהל, ומפעיל את השירות המשודרג.
-4. **מעכשיו והלאה:** לעולם לא תתבקש עוד לאשר חלון מנהל (UAC) - כל פקודות ה-Python, סקריפטי העדכון ובקרת המנוע עובדים אוטומטית ללא הרשאות מנהל!
-
----
-
-## 9. בקרת סרבו בחוג סגור (Closed-Loop Servo Controller) ומודל שיכוך חיכוך
-
-מערכת ה-Servo Controller ([`servo_controller.py`](file:///C:/Users/ישראל/Desktop/weel_motor/servo_controller.py)) הופכת את ההגה למנוע סרבו רובוטי מדויק בעל 5 יכולות מפתח:
-
-### א. ביטול מוחלט של רעידות וחוסר יציבות (Vibration & Chatter Elimination)
-* **שורש הבעיה:** כאשר מחשבים פיצוי חיכוך כפונקציה של שגיאת המיקום ($K_{ff} \cdot \tanh(\text{error})$), המנוע מפעיל מומנט חזק גם כשההגה הגיע ליעד ובמהירות אפס, מה שמייצר תנודת גבול (Limit Cycle Chatter) סביב האפס.
-* **הפתרון ההנדסי:** פיצוי חיכוך תלוי מהירות בלבד ($ff_{fric} = K_{ff} \cdot \tanh(v_{prof} / v_0)$). כאשר הפרופיל נעצר ($v_{prof} \to 0$), כוח החיכוך מתאפס חלק לחלוטין.
-* **Deadband סביב האפס:** שגיאות מתחת ל-0.4° מאופסות, מה שמבטיח עצירה מוחלטת ושקט מנועי מלא.
-
-### ב. מניעת נעילת קושחה אוטומטית (Continuous Float Keep-Alive)
-* קושחת Thrustmaster נועלת את גלגל ההגה אם במשך מספר מילי-שניות לא מופעל אפקט היזון כוח.
-* מנוע הבקרה שומר אפקט `ConstantForceEffect` קבוע באורך של 60 דקות ברמת `Gain = 0.02` (2% כוח).
-* בסיום כל פקודת סיבוב (`durationMs`), המנוע חוזר אוטומטית למצב 0.02 (Float) במקום לעצור את האפקט. כתוצאה מכך, **ההגה לעולם אינו ננעל מחדש מעצמו**.
-
-### ד. שליטה במצב הסופי (נעילה אקטיבית או שחרור) ופקודת נעילה מיידית
-* **שליטה במצב לאחר הגעה (`goto`):**
-  * **שחרור לציפה חופשית (`release`):** ברירת המחדל – עם ההגעה לזווית היעד המנוע משתחרר לחלוטין ומאפשר סיבוב חופשי ביד.
-  * **נעילה והחזקה אקטיבית במקום (`lock`):** עם ההגעה לזווית היעד, מנוע הסרבו נועל את ההגה מיידית ומתנגד לכל כוח חיצוני/דחיפה ביד. ניתן להגדיר משך זמן בשניות (למשל `10` שניות) או ללא הגבלה (עד לחיצת `Ctrl+C`).
-* **נעילה מיידית בכל נקודה (`lock`):**
-  * פקודת `lock` דוגמת את הזווית המדויקת שבה ההגה נמצא כרגע ונועלת אותו עליה מיידית בחוג סגור רובוטי.
-
----
-
-## 10. ניהול הרשאות קבועות ללא UAC (Bypassing Elevation Permanently)
-
-כדי לאפשר לסקריפטים להתעדכן ולשלוט בשירות המערכת ללא צורך באישור חלונות מנהל חוזרים ונשנים:
-1. **הרשאות תיקייה:** מוענקות הרשאות כתיבה מלאות (`icacls ... /grant Users:(OI)(CI)F`) לתיקיית היעד ב-`Program Files (x86)`.
-2. **הרשאות בקרת שירות (Service DACL):** באמצעות `sc.exe sdset WheelCompatibilityService` מוענקות למשתמשים מחוברים הרשאות מלאות להפסקת והפעלת השירות (`SERVICE_START` ו-`SERVICE_STOP`).
-3. **משימת Windows מתוזמנת (`schtasks /RL HIGHEST`):** מוגדרת משימה בשם `WheelMotorElevatedTask` הפועלת תחת חשבון `SYSTEM`. כל משתמש רגיל או סקריפט Python יכול להפעיל אותה באמצעות `schtasks /Run /TN WheelMotorElevatedTask` ללא שום בקשת סיסמה או אישור UAC.
-
+To enable non-admin scripts to control the motor and update binaries without elevation prompts:
+1. **Folder Permissions:** Users are granted full control (`icacls ... /grant Users:(OI)(CI)F`) over the installation directory in `C:\Program Files (x86)\XboxWheelCompatibility`.
+2. **Service DACL:** Using `sc.exe sdset WheelCompatibilityService`, interactive and authenticated users are granted `SERVICE_START` and `SERVICE_STOP` rights.
+3. **Elevated Maintenance Task:** A Windows Scheduled Task configured to run under `SYSTEM` allows instant binary updates without UAC intervention.

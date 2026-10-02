@@ -1,77 +1,77 @@
 # Steering Wheel Closed-Loop Servo Controller 🎮🏎️
-### בקרת סרבו חוג-סגור להגה מרוצים (Force Feedback Racing Wheel Servo System)
+### Force Feedback Racing Wheel Servo Positioning & Motor Control System
 
-מערכת מלאה לבקרת מנוע הגה (FFB) בחוג סגור, המאפשרת סיבוב מדויק לכל זווית, שליטה במהירות, נעילה אקטיבית, שחרור מלא (גלגל חופשי), כיול גבולות מכניים וטלמטריה בזמן אמת – **ללא צורך בהרשאות מנהל (Zero UAC)**.
-
----
-
-## תכונות מרכזיות (Key Features)
-
-* **שליטה בזווית ומהירות (`goto`):** סיבוב הגה מבוקר לכל זווית רצויה (`-450.0°` עד `+450.0°`) במהירות מוגדרת (`°/s`), עם מנגנון מובנה למניעת חריגה (Anti-Overshoot) ושבירת חיכוך סטטי (Adaptive Stall Recovery).
-* **בחירת מצב סיום:** אפשרות לבחור האם לאחר ההגעה לזווית ההגה יישאר **נעול** (`lock`) או **משוחרר** (`release`).
-* **נעילת הגה בכל נקודה (`lock`):** נעילה רובוטית חזקה מיידית בנקודה הנוכחית של ההגה או בזווית מבוקשת, לזמן מוגדר או ללא הגבלת זמן.
-* **שחרור מלא ללא התנגדות (`release`):** שחרור מלא של המנוע וביטול קפיץ המרכוז של היצרן (Free Float / Zero Resistance).
-* **איפוס דרייבר מהיר (`reset`):** איפוס ורענון מלא של מנוע הכוח בדרייבר תוך פחות משנייה במקרה הצורך.
-* **כיול גבולות אוטומטי (`calibrate`):** מציאת גבולות מכניים שמאלה וימינה (Hardstops) ומרכוז מושלם של ההגה לאמצע האמיתי.
-* **מוניטור טלמטריה בזמן אמת (`monitor`):** הצגת זווית ההגה והדוושות בזמן אמת בטרמינל.
-* **אפס חלונות מנהל (Zero UAC):** שירות הרקע פועל תחת `SYSTEM`, ומאפשר לכל סקריפט רגיל לשלוט במנוע מיידית ללא צורך בהרשאות מנהל.
+A complete closed-loop force feedback (FFB) steering wheel servo system enabling high-precision angular positioning, speed control, active robotic holding/locking, zero-resistance free float, mechanical limit calibration, and real-time telemetry — **with Zero UAC / non-admin execution**.
 
 ---
 
-## פקודות שימוש מהיר (CLI Commands)
+## Key Features
 
-כל הפקודות מופעלות דרך [`servo_controller.py`](servo_controller.py):
+* **Precision Angle & Speed Control (`goto`):** Drive the wheel accurately to any target angle (`-450.0°` to `+450.0°`) at a user-defined speed (`°/s`), with built-in anti-overshoot settling and adaptive stall recovery to overcome mechanical static friction.
+* **Selectable Post-Arrival State:** Choose whether the wheel stays firmly **locked** (`lock`) or completely **released** (`release`) once it reaches the destination.
+* **Instant Lock at Any Angle (`lock`):** Instantly lock the wheel at its current position (or any target angle) with active robotic resistance, either indefinitely or for a specified duration.
+* **Full Motor Release (`release`):** Completely release the motor and eliminate manufacturer centering springs (Free Float / Zero Resistance).
+* **Instant Driver Reset (`reset`):** Safely reinitialize and refresh the force feedback motor driver within milliseconds whenever needed.
+* **Automatic End-Stop Calibration (`calibrate`):** Detect physical mechanical hardstops left and right and find the true mechanical center automatically.
+* **Real-Time Telemetry Monitor (`monitor`):** Stream live steering angles and pedal inputs directly in the terminal.
+* **Zero UAC Elevation (Non-Admin):** The background service runs under `SYSTEM`, allowing standard command-line scripts to control the motor immediately without annoying Windows Administrator prompts.
+
+---
+
+## Quick Start CLI Commands
+
+All commands are executed via [`servo_controller.py`](servo_controller.py):
 
 ```powershell
-# 1. הגעה לזווית עם שליטה במהירות ושחרור בסיום:
+# 1. Move to angle with speed control and release upon arrival:
 python servo_controller.py goto 200 40 release
 python servo_controller.py goto -90 120 release
 
-# 2. הגעה לזווית ונעילה בסיום (נעילה קבועה או למספר שניות):
+# 2. Move to angle with speed control and lock upon arrival (indefinitely or for N seconds):
 python servo_controller.py goto 0 100 lock
 python servo_controller.py goto 45 60 lock 5
 
-# 3. נעילת ההגה בנקודה הנוכחית (קבוע או למספר שניות):
+# 3. Lock wheel at CURRENT position (indefinitely or for N seconds):
 python servo_controller.py lock
 python servo_controller.py lock 10
 
-# 4. שחרור מלא של ההגה (הגה חופשי לגמרי):
+# 4. Completely release wheel (zero resistance free float):
 python servo_controller.py release
 
-# 5. איפוס מהיר של מנוע הדרייבר:
+# 5. Fast motor driver reset & recover:
 python servo_controller.py reset
 
-# 6. כיול גבולות מכניים ומרכוז פיזי:
+# 6. Calibrate mechanical hard limits and center:
 python servo_controller.py calibrate
 
-# 7. קביעת הנקודה הנוכחית כ-0.0° (Homing):
+# 7. Set current position as 0.0° (Homing):
 python servo_controller.py zero
 
-# 8. ניטור זווית ההגה בזמן אמת בטרמינל:
+# 8. Real-time live angle display in terminal:
 python servo_controller.py monitor
 ```
 
 ---
 
-## בדיקות ואימות מערכת (Automated Test Suite)
+## Automated Verification Suite
 
-כדי לאמת את כל מצבי המערכת באופן פיזי על ההגה:
+To verify all system operational modes on physical hardware:
 
 ```powershell
 python test_all_modes.py
 ```
 
-הבדיקה מריצה 6 מבחנים אוטומטיים:
-1. איפוס דרייבר ובדיקת סטטוס וחיבור מנוע.
-2. סיבוב ימינה ושמאלה ובדיקת תגובת כוח.
-3. הגעה מדויקת במהירות איטית (35°/s) ושחרור.
-4. הגעה מדויקת במהירות מהירה (140°/s) ושחרור.
-5. הגעה למרכז (0°) ונעילה אקטיבית (`Holding`).
-6. שחרור מיידי למצב צף (`Released`).
+The test suite runs 6 automated checks:
+1. Driver reset, status verification, and motor health.
+2. Bidirectional rotation (right & left torque response).
+3. Slow motion positioning (35°/s) with post-arrival release.
+4. Fast motion positioning (140°/s) with post-arrival release.
+5. Center positioning (0.0°) with post-arrival active robotic lock (`Holding`).
+6. Instant motor release (`Released`, zero resistance).
 
 ---
 
-## ארכיטקטורת המערכת (Architecture)
+## Architecture Overview
 
 ```
 +-------------------------------------------------------------+
@@ -98,34 +98,34 @@ python test_all_modes.py
 
 ---
 
-## התקנה ראשונית (One-Time Setup)
+## One-Time Setup
 
-1. **הגדרת הרשאות קבועות ללא UAC:**
-   הפעל פעם אחת בלבד את הסקריפט:
+1. **Grant permanent permissions (Zero UAC):**
+   Run the setup script once from an elevated PowerShell prompt:
    ```powershell
    powershell -ExecutionPolicy Bypass -File setup_permanent_admin.ps1
    ```
-2. השירות מותקן ומנוהל בכתובת `http://127.0.0.1:16582`.
-3. מעתה ואילך, כל הפקודות והסקריפטים פועלים ממשתמש רגיל ללא שום בקשת מנהל.
+2. The service is installed and listens locally on `http://127.0.0.1:16582`.
+3. From this point forward, all Python scripts and CLI commands run smoothly from standard, non-elevated user accounts without any UAC popups.
 
 ---
 
-## הידור מקוד מקור (Compiling from Source - Optional)
+## Compiling from Source (Optional)
 
 > [!NOTE]
-> **אין חובה לקמפל!** התיקייה [`published_service/`](published_service/) כבר מכילה את כל קבצי ההרצה הבינאריים המוכנים והמעודכנים (Self-contained Plug & Play).
+> **No compilation required!** The [`published_service/`](published_service/) directory contains precompiled standalone binaries ready to run out of the box.
 
-אם בכל זאת תרצה לקמפל בעצמך מקוד המקור (ללא שום צורך בהתקנת Visual Studio הכבדה, אלא רק ב-CLI בסיסי ומינימלי):
+If you wish to recompile the Windows service from source (using only the lightweight .NET CLI, without Visual Studio):
 
-1. **התקנת ה-CLI בלבד (אם טרם מותקן):**
+1. **Install .NET SDK CLI (if not already installed):**
    ```powershell
    winget install Microsoft.DotNet.SDK.8
    ```
-2. **הידור בפקודה אחת בודדת:**
+2. **Compile in a single command:**
    ```powershell
    dotnet publish service_source/WheelCompatibilityService/WheelCompatibilityService.csproj -c Release -o published_service
    ```
-3. **עדכון השירות המותקן (ללא צורך במנהל):**
+3. **Deploy updated binary to the service (zero admin needed):**
    ```powershell
    Stop-Service WheelCompatibilityService
    Copy-Item published_service\* 'C:\Program Files (x86)\XboxWheelCompatibility\Service\' -Force -Recurse
@@ -134,19 +134,19 @@ python test_all_modes.py
 
 ---
 
-## מבנה הפרויקט (Project Structure)
+## Project Structure
 
-* [`servo_controller.py`](servo_controller.py) - בקר הסרבו הראשי והממשק למשתמש.
-* [`wheel_motor_api.py`](wheel_motor_api.py) - ספריית Python לתקשורת מול ה-API של המנוע.
-* [`test_all_modes.py`](test_all_modes.py) - סוויטת בדיקות אוטומטית מלאה.
-* [`setup_permanent_admin.ps1`](setup_permanent_admin.ps1) - סקריפט הגדרת הרשאות חד-פעמי.
-* [`published_service/`](published_service/) - קבצי ההפעלה המהודרים של השירות (Plug & Play ללא תלות ב-SDK).
-* [`service_source/`](service_source/) - קוד המקור ב-C# (.NET) של שירות המנוע ו-`WheelMotorController`.
-* [`drivers/`](drivers/) - דרייברי החומרה המקוריים של Windows (`.inf`, `.sys`) עבור ההגה.
-* [`WHEEL_MOTOR_PROTOCOL.md`](WHEEL_MOTOR_PROTOCOL.md) - תיעוד טכני מלא של הפרוטוקול ונקודות הקצה ב-HTTP.
-* [`tmp/`](tmp/) - ספריה המכילה סקריפטים וקבצי בדיקה זמניים שנשמרו בצד.
+* [`servo_controller.py`](servo_controller.py) - Main closed-loop servo controller CLI.
+* [`wheel_motor_api.py`](wheel_motor_api.py) - Python HTTP client library for motor control.
+* [`test_all_modes.py`](test_all_modes.py) - Automated physical verification test suite.
+* [`setup_permanent_admin.ps1`](setup_permanent_admin.ps1) - One-time permission setup script (Zero UAC).
+* [`published_service/`](published_service/) - Precompiled service binaries (Plug & Play, no SDK required).
+* [`service_source/`](service_source/) - Full C# (.NET) source code for the Windows service and `WheelMotorController`.
+* [`drivers/`](drivers/) - Original Windows hardware driver packages (`.inf`, `.sys`) for the wheel.
+* [`WHEEL_MOTOR_PROTOCOL.md`](WHEEL_MOTOR_PROTOCOL.md) - Complete technical protocol and HTTP endpoint specification.
+* [`tmp/`](tmp/) - Temporary scratch scripts and logs kept for reference.
 
 ---
 
-## רישיון (License)
-פרויקט זה מופץ תחת רישיון MIT.
+## License
+This project is licensed under the MIT License.

@@ -1,4 +1,4 @@
-# Permanent Admin Authorization Setup (הגדרת הרשאות קבועות ללא צורך באישור מנהל בעתיד)
+# Permanent Admin Authorization Setup (Grants permanent permissions for zero-UAC execution)
 $ErrorActionPreference = "Continue"
 
 Write-Host "============================================================" -ForegroundColor Cyan
@@ -24,8 +24,8 @@ Write-Host "  [OK] Service permissions updated. Any script can now start/stop th
 # 3. Create Windows Scheduled Task for instant elevated updates without UAC
 Write-Host "[3/4] Registering Scheduled Task 'WheelMotorElevatedTask'..." -ForegroundColor Cyan
 $taskName = "WheelMotorElevatedTask"
-$runnerScript = "C:\Users\A404~1\Desktop\WEEL_M~1\update_service_elevated.ps1"
-$action = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$runnerScript`""
+$runnerScript = Join-Path $PSScriptRoot "published_service\WheelCompatibilityService.exe"
+$action = "`"$runnerScript`""
 
 & schtasks.exe /Delete /TN $taskName /F 2>$null
 & schtasks.exe /Create /TN $taskName /TR $action /SC ONCE /ST 00:00 /RL HIGHEST /RU "SYSTEM" /F
@@ -40,7 +40,7 @@ Start-Sleep -Seconds 1
 Get-Process -Name "WheelCompatibilityService" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 
-$source = "C:\Users\A404~1\Desktop\WEEL_M~1\published_service\WheelCompatibilityService.exe"
+$source = Join-Path $PSScriptRoot "published_service\WheelCompatibilityService.exe"
 $target = "C:\Program Files (x86)\XboxWheelCompatibility\Service\WheelCompatibilityService.exe"
 
 Copy-Item -Path $source -Destination $target -Force

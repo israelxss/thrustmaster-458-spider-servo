@@ -1,29 +1,28 @@
-# Windows Hardware Drivers for Xbox Steering Wheel (FFB)
-### דרייברי החומרה של Windows עבור הגה מרוצים (Xbox GIP)
+# Windows Hardware Drivers for Xbox Steering Wheel (Force Feedback)
 
-תיקייה זו מרכזת את כל דרייברי החומרה המקוריים (`.inf`, `.sys`) של Windows המשמשים לתקשורת, זיהוי ושליטה במנוע של הגה המרוצים (`VID_044F&PID_B664`).
+This directory contains the original Windows hardware drivers (`.inf`, `.sys`) required for hardware recognition, communication, and motor control of the force feedback racing wheel (`VID_044F&PID_B664`).
 
 ---
 
-## פירוט הדרייברים (Driver Packages)
+## Driver Packages Overview
 
 ### 1. `dc1-controller/` (`dc1-controller.inf`, `dc1-controller.sys`)
-* **תפקיד:** דרייבר ה-USB הראשי (Xbox Composite Device) המזהה את החומרה ברמת ה-USB Bus.
-* **מזהי חומרה נתמכים:**
-  * `USB\VID_044F&PID_B664` (הגה Thrustmaster)
-  * `USB\MS_COMP_XGIP10` (פרוטוקול Xbox Game Input)
+* **Role:** The primary USB composite driver (Xbox Composite Device) that recognizes the physical hardware on the USB bus.
+* **Matched Hardware IDs:**
+  * `USB\VID_044F&PID_B664` (Thrustmaster racing wheel base)
+  * `USB\MS_COMP_XGIP10` (Xbox Game Input Protocol descriptor)
 
 ### 2. `xboxgip/` (`xboxgip.inf`, `xboxgip.sys`, `devauthe.sys`)
-* **תפקיד:** דרייבר ליבה מרכזי של מיקרוסופט (Kernel-Mode Driver) עבור פרוטוקול ה-GIP (Game Input Protocol) וניהול האימות והתקשורת הדו-כיוונית מול מנוע ה-Force Feedback.
+* **Role:** Microsoft's core kernel-mode driver for the Game Input Protocol (GIP). Handles device authentication, bidirection input stream, and actuators/Force Feedback motor packet transport.
 
 ### 3. `xboxgipsynthetic/` (`xboxgipsynthetic.inf`)
-* **תפקיד:** דרייבר עבור התקנים סינתטיים וממשק ה-XInput / WinRT של בקרי Xbox.
+* **Role:** Driver for synthetic Xbox virtual input devices and modern Windows.Gaming.Input / XInput runtime mapping.
 
 ---
 
-## כיצד להתקין או לרענן ידנית (במידת הצורך)
+## Manual Driver Installation / Reinstall
 
-במידה וההגה לא מזוהה במחשב אחר או שהדרייבר השתבש, ניתן להתקין מחדש דרך PowerShell (כמנהל):
+If the steering wheel is connected to a fresh Windows PC or driver bindings need to be refreshed, install them using PowerShell (as Administrator):
 
 ```powershell
 pnputil /add-driver dc1-controller\dc1-controller.inf /install

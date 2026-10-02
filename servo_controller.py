@@ -1,13 +1,13 @@
 """
-Steering Wheel Closed-Loop Servo Controller (בקרת סרבו חוג סגור מלאה להגה)
+Steering Wheel Closed-Loop Servo Controller
 Features:
 - Pure Torque Control (Zero manufacturer springs or locks)
 - Real-Time 1000Hz Angle Telemetry (XInput & API)
-- Automatic Hard-Stop / Limit Calibration (מציאת גבולות מכניים שמאלה וימינה)
-- True Mechanical Homing & Zeroing (איפוס ומרכוז מבוקר)
+- Automatic Hard-Stop / Limit Calibration (Find mechanical limits left and right)
+- True Mechanical Homing & Zeroing (Calibrated zeroing and centering)
 - Closed-Loop Profiled PID Positioning (Goto angle with smooth deceleration)
-- Active Robotic Servo Hold (שמירת מיקום אקטיבית)
-- Free Float / Release (שחרור מנוע מלא ללא שום התנגדות)
+- Active Robotic Servo Hold (Active position hold and damping)
+- Free Float / Release (Full motor release with zero resistance)
 """
 
 import time
@@ -90,7 +90,7 @@ class WheelServoSystem:
         Then calculates the true mechanical center and drives smoothly to it.
         """
         print("==================================================================")
-        print("       Automatic End-Stop & Center Calibration (כיול גבולות)")
+        print("             Automatic End-Stop & Center Calibration")
         print("==================================================================")
 
         # 1. Drive left
@@ -293,7 +293,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 2:
         print("==================================================================")
-        print("       Closed-Loop Steering Wheel Servo Controller (בקרת סרבו)")
+        print("           Closed-Loop Steering Wheel Servo Controller")
         print("==================================================================")
         print("Commands:")
         print("  python servo_controller.py goto <deg> [spd] [lock/release] [sec] - Move with speed & lock choice")
