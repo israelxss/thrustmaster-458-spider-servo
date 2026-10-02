@@ -3,6 +3,8 @@
 
 A complete closed-loop force feedback (FFB) steering wheel servo system enabling high-precision angular positioning, speed control, active robotic holding/locking, zero-resistance free float, mechanical limit calibration, and real-time telemetry — **with Zero UAC / non-admin execution**.
 
+Designed and calibrated specifically for the **Thrustmaster Ferrari 458 Spider Racing Wheel** (Xbox / PC, Hardware ID: `USB\VID_044F&PID_B664`).
+
 ---
 
 ## Key Features
@@ -145,6 +147,12 @@ If you wish to recompile the Windows service from source (using only the lightwe
 * [`drivers/`](drivers/) - Original Windows hardware driver packages (`.inf`, `.sys`) for the wheel.
 * [`WHEEL_MOTOR_PROTOCOL.md`](WHEEL_MOTOR_PROTOCOL.md) - Complete technical protocol and HTTP endpoint specification.
 * [`tmp/`](tmp/) - Temporary scratch scripts and logs kept for reference.
+
+---
+
+## Acknowledgements & Attribution
+
+This project is built upon and inspired by the foundational research in [camren-m/XboxWheelCompatibility](https://github.com/camren-m/XboxWheelCompatibility). While the upstream repository served solely as an input compatibility bridge (injecting wheel steering and pedals into a virtual Xbox controller without motor actuation), this work reverse-engineers the Windows force feedback driver pipeline, overcomes the kernel 32-bit microsecond counter overflow, implements bi-directional HTTP REST motor control, and introduces a precision closed-loop robotics servo controller.
 
 ---
 

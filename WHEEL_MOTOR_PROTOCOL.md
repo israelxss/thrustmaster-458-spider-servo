@@ -24,7 +24,7 @@ Thrustmaster racing wheel bases (TX, Ferrari 458 Spider, T300) utilize a brushle
 When the wheel is connected to a computer over USB:
 1. **Xbox / GIP Initialization Mode:** The wheel enumerates by default with hardware ID `044F:B664` using the Microsoft Xbox Game Input Protocol (GIP).
 2. **Firmware Default Centering Spring:** The internal wheel base firmware is programmed so that if no active software Force Feedback effect is commanded by the PC, the microcontroller automatically applies internal centering resistance to hold the wheel centered and prevent it from freely spinning or falling under rim weight.
-3. **The Limitation of Upstream Compatibility Bridges:** Traditional compatibility bridges only read steering angle, pedals, and button states, injecting them as virtual gamepad inputs (`InputInjector`). They send **zero motor commands** back to the wheel base.
+3. **The Limitation of Upstream Compatibility Bridges:** Traditional compatibility bridges (such as [camren-m/XboxWheelCompatibility](https://github.com/camren-m/XboxWheelCompatibility), which served as the research baseline for input decoding) only read steering angle, pedals, and button states, injecting them as virtual gamepad inputs (`InputInjector`). They send **zero motor commands** back to the wheel base.
 4. **The Result:** The wheel remains permanently stiff and locked against the user because no software has taken ownership of the force feedback motor to command it to release.
 
 ---
@@ -32,6 +32,7 @@ When the wheel is connected to a computer over USB:
 ## 2. Hardware Identification & USB Protocol
 
 Device inspection on Windows reveals the following device configuration:
+* **Target Hardware:** Thrustmaster Ferrari 458 Spider Racing Wheel (Xbox One / PC)
 * **Vendor ID (VID):** `0x044F` (Thrustmaster / Guillemot Corporation)
 * **Product ID (PID):** `0xB664` (Thrustmaster Wheel Base in Xbox/GIP mode)
 * **PnP Device ID:** `USB\VID_044F&PID_B664\0000E3DE012DB8F0`
